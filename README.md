@@ -14,7 +14,7 @@ devtools::install_github("nk027/influential_sets")
 
 ### Quick Start
 For a quick start, try out the following:
-```
+```r
 library("influence") # Load the package
 
 # 1. reproduce the toy example -----
@@ -28,6 +28,7 @@ y <- c( # The outliers differ in effect
 )
 mdl <- lm(y ~ x - 1) # Fit a linear model (w/o intercept) ---
 plot(x, y); abline(mdl, col = "darkgray", lwd = 2)
+
 # Find the influential sets ---
 mdl_sens <- sens(mdl) # Turns the first coef negative by default
 mdl_sens$influence$id[1:7] # Adaptive results
