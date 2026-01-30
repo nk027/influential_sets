@@ -1,4 +1,3 @@
-
 # Migration ---------
 
 library("dplyr")
@@ -13,17 +12,21 @@ devtools::load_all()
 # Shorthand to target t-values
 get_sens <- \(m, pos = 2L, target = c("tstat", "beta", "se")) {
   target <- match.arg(target)
-  sign <- if(target == "se") -1 else sign(coef(m)[pos])
-  if(class(m) == "ivreg") {
-    sens.ivreg(m,
+  sign <- if (target == "se") -1 else sign(coef(m)[pos])
+  if (class(m) == "ivreg") {
+    sens.ivreg(
+      m,
       lambda = set_lambda(target, pos = pos, sign = sign),
       options = set_options(n_max = 80L, tstat = TRUE, cluster = TRUE),
-      cluster = seq_along(resid(m)))
+      cluster = seq_along(resid(m))
+    )
   } else {
-    sens.lm(m,
+    sens.lm(
+      m,
       lambda = set_lambda(target, pos = pos, sign = sign),
       options = set_options(n_max = 80L, tstat = TRUE, cluster = TRUE),
-      cluster = seq_along(resid(m)))
+      cluster = seq_along(resid(m))
+    )
   }
 }
 
@@ -43,9 +46,12 @@ coeftest(mdl_base, vcov = vcovHC(mdl_base, "HC4"))
 
 # Compare adaptive and initial sets
 overlap <- vector("numeric", 20L)
-for(i in seq_along(overlap)) {
-  overlap[i] <- sum(sens_base$influence$id[seq(i)] %in%
-    sens_base$initial$id[seq(i)] / i)
+for (i in seq_along(overlap)) {
+  overlap[i] <- sum(
+    sens_base$influence$id[seq(i)] %in%
+      sens_base$initial$id[seq(i)] /
+      i
+  )
 }
 overlap # 60% for 5, 60% for 10
 
@@ -63,9 +69,12 @@ coeftest(mdl_plain, vcov = vcovHC(mdl_plain, "HC4"))
 
 # Compare adaptive and initial sets
 overlap <- vector("numeric", 20L)
-for(i in seq_along(overlap)) {
-  overlap[i] <- sum(sens_plain$influence$id[seq(i)] %in%
-    sens_plain$initial$id[seq(i)] / i)
+for (i in seq_along(overlap)) {
+  overlap[i] <- sum(
+    sens_plain$influence$id[seq(i)] %in%
+      sens_plain$initial$id[seq(i)] /
+      i
+  )
 }
 overlap # 40% for 5, 50% for 10
 
@@ -94,36 +103,112 @@ summary.sensitivity(sens_plain_f) # 10/18/31 (Alg0 needs 14/47/-)
 sens_se1 <- get_sens(mdl_base, target = "se") # We can break it with 18
 sens_se2 <- get_sens(mdl_plain, target = "se") # We can break it with 17
 # Essentially, we're getting rid of the IV
-sens_num <- sens.lm(mdl_base_f,
-  lambda = set_lambda("custom", f = function(x, ...) {abs(x[["tstat_i"]][, 2])}),
+sens_num <- sens.lm(
+  mdl_base_f,
+  lambda = set_lambda("custom", f = function(x, ...) {
+    abs(x[["tstat_i"]][, 2])
+  }),
   options = set_options(n_max = 80L, tstat = TRUE, cluster = TRUE),
-  cluster = seq_along(resid(mdl_base_f)))
+  cluster = seq_along(resid(mdl_base_f))
+)
 v <- sens_num$model[, c("beta_2", "se_2")]
 v[, 1] / v[, 2]
 
 
 # Investigate influential observations ---
 
-df <- cbind("id" = seq_along(data$y), "gdp" = data$y,
-  "pct_eu" = data$X[, 2], data$Z[, -1]) |> as_tibble()
+df <- cbind(
+  "id" = seq_along(data$y),
+  "gdp" = data$y,
+  "pct_eu" = data$X[, 2],
+  data$Z[, -1]
+) |>
+  as_tibble()
 
 # Remove observations
 rm <- sens_base$influence$id[seq(4)]
-m_rm <- ivreg(gdp ~ pct_eu + dist_ba + land_qu + rail_dens +
-  pct_agr + pop_dens + rate_urb +
-  rain_m + temp_m + elev_m + rel_m + ba + sf + er |
-  iv1 + dist_ba + land_qu + rail_dens +
-  pct_agr + pop_dens + rate_urb +
-  rain_m + temp_m + elev_m + rel_m + ba + sf + er, data = df[-rm, ])
+m_rm <- ivreg(
+  gdp ~ pct_eu +
+    dist_ba +
+    land_qu +
+    rail_dens +
+    pct_agr +
+    pop_dens +
+    rate_urb +
+    rain_m +
+    temp_m +
+    elev_m +
+    rel_m +
+    ba +
+    sf +
+    er |
+    iv1 +
+      dist_ba +
+      land_qu +
+      rail_dens +
+      pct_agr +
+      pop_dens +
+      rate_urb +
+      rain_m +
+      temp_m +
+      elev_m +
+      rel_m +
+      ba +
+      sf +
+      er,
+  data = df[-rm, ]
+)
 coeftest(m_rm, vcov = vcovHC(m_rm, "HC4")) # Needs 5 with HC0, 4 with HC4
 
 # Full models
-m_iv <- ivreg(gdp ~ pct_eu + dist_ba + land_qu + rail_dens +
-  pct_agr + pop_dens + rate_urb + rain_m + temp_m + elev_m + rel_m +
-  ba + sf + er | iv1 + dist_ba + land_qu + rail_dens + pct_agr + pop_dens +
-  rate_urb + rain_m + temp_m + elev_m + rel_m + ba + sf + er, data = df)
-m_lm <- lm(pct_eu ~ iv1 + dist_ba + land_qu + rail_dens + pct_agr + pop_dens +
-  rate_urb + rain_m + temp_m + elev_m + rel_m + ba + sf + er, data = df)
+m_iv <- ivreg(
+  gdp ~ pct_eu +
+    dist_ba +
+    land_qu +
+    rail_dens +
+    pct_agr +
+    pop_dens +
+    rate_urb +
+    rain_m +
+    temp_m +
+    elev_m +
+    rel_m +
+    ba +
+    sf +
+    er |
+    iv1 +
+      dist_ba +
+      land_qu +
+      rail_dens +
+      pct_agr +
+      pop_dens +
+      rate_urb +
+      rain_m +
+      temp_m +
+      elev_m +
+      rel_m +
+      ba +
+      sf +
+      er,
+  data = df
+)
+m_lm <- lm(
+  pct_eu ~ iv1 +
+    dist_ba +
+    land_qu +
+    rail_dens +
+    pct_agr +
+    pop_dens +
+    rate_urb +
+    rain_m +
+    temp_m +
+    elev_m +
+    rel_m +
+    ba +
+    sf +
+    er,
+  data = df
+)
 
 # Condition index
 svd(scale(df[, -1:-3]))$d^2 # max(d) / d following BKW
@@ -136,8 +221,23 @@ sort(car::vif(m_iv), decreasing = TRUE)
 sort(car::vif(m_lm), decreasing = TRUE)
 
 rm <- get_sens(mdl_base, target = "se")$influence$id
-m_lm <- lm(pct_eu ~ iv1 + dist_ba + land_qu + rail_dens + pct_agr + pop_dens +
-  rate_urb + rain_m + temp_m + elev_m + rel_m + ba + sf + er, data = df[-rm, ])
+m_lm <- lm(
+  pct_eu ~ iv1 +
+    dist_ba +
+    land_qu +
+    rail_dens +
+    pct_agr +
+    pop_dens +
+    rate_urb +
+    rain_m +
+    temp_m +
+    elev_m +
+    rel_m +
+    ba +
+    sf +
+    er,
+  data = df[-rm, ]
+)
 # Condition index
 svd(scale(df[-rm, -1:-3]))$d^2
 svd(scale(cbind(predict(m_lm), df[-rm, c(-1:-4)])))$d^2
@@ -150,54 +250,111 @@ rcond(as.matrix(cbind(predict(m_lm), df[-rm, c(-1:-4)])))
 
 tbl <- data.frame(
   v = c(
-    "European share$^\\dag$", "", "Instrument$^\\dag$", "",
-    "Geographic controls", "Socioeconomic controls", "Province fixed effects",
-    "Thresholds$^\\dag$", "Observations", "$R^2$"
+    "European share$^\\dag$",
+    "",
+    "Instrument$^\\dag$",
+    "",
+    "Geographic controls",
+    "Socioeconomic controls",
+    "Province fixed effects",
+    "Thresholds$^\\dag$",
+    "Observations",
+    "$R^2$"
   ),
   m1_first = c(
-    "", "",
+    "",
+    "",
     coeftest(mdl_base_f, vcov = vcovHC(mdl_base_f, "HC1"))[2, c(1, 3)] |>
-    {\(x) c(round(x[1], 3), paste0("(", round(x[2], 2), ")"))}(),
-    "Yes", "Yes", "Yes",
-    "10[18]\\{26\\}", len(mdl_base$y), round(summary(mdl_base_f)$r.squared, 3)
+      {
+        \(x) c(round(x[1], 3), paste0("(", round(x[2], 2), ")"))
+      }(),
+    "Yes",
+    "Yes",
+    "Yes",
+    "10[18]\\{26\\}",
+    len(mdl_base$y),
+    round(summary(mdl_base_f)$r.squared, 3)
   ),
   m1 = c(
     coeftest(mdl_base, vcov = vcovHC(mdl_base, "HC0"))[2, c(1, 3)] |>
-    {\(x) c(round(x[1], 3), paste0("(", round(x[2], 2), ")"))}(),
-    "", "",
-    "Yes", "Yes", "Yes",
-    "5[11]\\{27\\}", len(mdl_base$y), round(summary(mdl_base)$r.squared, 3)
+      {
+        \(x) c(round(x[1], 3), paste0("(", round(x[2], 2), ")"))
+      }(),
+    "",
+    "",
+    "Yes",
+    "Yes",
+    "Yes",
+    "5[11]\\{27\\}",
+    len(mdl_base$y),
+    round(summary(mdl_base)$r.squared, 3)
   ),
   m2_first = c(
-    "", "",
+    "",
+    "",
     coeftest(mdl_plain_f, vcov = vcovHC(mdl_plain_f, "HC1"))[2, c(1, 3)] |>
-    {\(x) c(round(x[1], 3), paste0("(", round(x[2], 2), ")"))}(),
-    "Yes", "No", "Yes",
-    "10[18]\\{31\\}", len(mdl_plain$y), round(summary(mdl_plain_f)$r.squared, 3)
+      {
+        \(x) c(round(x[1], 3), paste0("(", round(x[2], 2), ")"))
+      }(),
+    "Yes",
+    "No",
+    "Yes",
+    "10[18]\\{31\\}",
+    len(mdl_plain$y),
+    round(summary(mdl_plain_f)$r.squared, 3)
   ),
   m2 = c(
     coeftest(mdl_plain, vcov = vcovHC(mdl_plain, "HC0"))[2, c(1, 3)] |>
-    {\(x) c(round(x[1], 3), paste0("(", round(x[2], 2), ")"))}(),
-    "", "",
-    "Yes", "No", "Yes",
-    "6[11]\\{32\\}", len(mdl_plain$y), round(summary(mdl_plain)$r.squared, 3)
+      {
+        \(x) c(round(x[1], 3), paste0("(", round(x[2], 2), ")"))
+      }(),
+    "",
+    "",
+    "Yes",
+    "No",
+    "Yes",
+    "6[11]\\{32\\}",
+    len(mdl_plain$y),
+    round(summary(mdl_plain)$r.squared, 3)
   )
 )
 tbl <- rbind(c("", rep(c("1st stage", "2nd stage"), 2)), tbl)
-kableExtra::kbl(tbl, format = "latex", booktabs = TRUE, align = "lrrrr",
-  escape = FALSE, label = "migration", position = "ht", row.names = FALSE,
-  col.names = c("$\\log \\text{GDP}/\\text{capita} \\sim$",
-    "Baseline", "", "Plain", ""),
-  linesep = c(rep("", 4), "\\addlinespace", rep("", 2), "\\addlinespace",
-    rep("", 3)),
-  caption = "Sensitivity of long-term migration impacts.")
+kableExtra::kbl(
+  tbl,
+  format = "latex",
+  booktabs = TRUE,
+  align = "lrrrr",
+  escape = FALSE,
+  label = "migration",
+  position = "ht",
+  row.names = FALSE,
+  col.names = c(
+    "$\\log \\text{GDP}/\\text{capita} \\sim$",
+    "Baseline",
+    "",
+    "Plain",
+    ""
+  ),
+  linesep = c(
+    rep("", 4),
+    "\\addlinespace",
+    rep("", 2),
+    "\\addlinespace",
+    rep("", 3)
+  ),
+  caption = "Sensitivity of long-term migration impacts."
+)
 
 
 # Plot marginalised instrument ----
-sens_num <- sens.lm(mdl_base_f,
-  lambda = set_lambda("custom", f = function(x, ...) {abs(x[["tstat_i"]][, 2])}),
+sens_num <- sens.lm(
+  mdl_base_f,
+  lambda = set_lambda("custom", f = function(x, ...) {
+    abs(x[["tstat_i"]][, 2])
+  }),
   options = set_options(n_max = 80L, tstat = TRUE, cluster = TRUE),
-  cluster = seq_along(resid(mdl_base_f)))
+  cluster = seq_along(resid(mdl_base_f))
+)
 
 data <- get_data.ivreg(mdl_base)
 rm <- sens_num$influence$id[seq(18)]
@@ -205,11 +362,26 @@ d_fwl <- update_fwl(data$Z, data$X[, 2], 2)
 r_fwl <- update_fwl(data$Z[-rm, ], data$X[-rm, 2], 2)
 
 cairo_pdf("paper/output/migration-iv.pdf", height = 2.4, width = 7)
-op <- par(mfrow = c(1, 2), mar = c(3, 4, 0, 1), bg = "transparent", family = "Noto Sans")
+op <- par(
+  mfrow = c(1, 2),
+  mar = c(3, 4, 0, 1),
+  bg = "transparent",
+  family = "Noto Sans"
+)
 plot.new()
-plot.window(xlim = range(d_fwl$X) + c(-.01, .01), ylim = range(d_fwl$y) + c(-.01, .01))
+plot.window(
+  xlim = range(d_fwl$X) + c(-.01, .01),
+  ylim = range(d_fwl$y) + c(-.01, .01)
+)
 points(x = d_fwl$X, y = d_fwl$y, pch = 1, cex = 1.25)
-points(x = d_fwl$X[rm], y = d_fwl$y[rm], pch = 4, cex = 1.75, lwd = 2, col = "#008080")
+points(
+  x = d_fwl$X[rm],
+  y = d_fwl$y[rm],
+  pch = 4,
+  cex = 1.75,
+  lwd = 2,
+  col = "#008080"
+)
 axis(1, at = round(c(min(d_fwl$X), 0, max(d_fwl$X)), 2))
 axis(2, at = round(c(min(d_fwl$y), 0, max(d_fwl$y)), 2), las = 1)
 abline(v = c(min(d_fwl$X), 0, max(d_fwl$X)), col = "darkgray", lty = 2)
@@ -218,7 +390,10 @@ abline(lm(y ~ X - 1, data = d_fwl), lwd = 2, col = "#800000")
 title(ylab = "Residualized outcome", line = 3, font.lab = 2)
 title(xlab = "Marginalized instrument", line = 2, font.lab = 2)
 plot.new()
-plot.window(xlim = range(d_fwl$X) + c(-.01, .01), ylim = range(d_fwl$y) + c(-.01, .01))
+plot.window(
+  xlim = range(d_fwl$X) + c(-.01, .01),
+  ylim = range(d_fwl$y) + c(-.01, .01)
+)
 points(x = r_fwl$X, y = r_fwl$y, pch = 1, cex = 1.25)
 axis(1, at = round(c(min(d_fwl$X), 0, max(d_fwl$X)), 2))
 axis(2, at = round(c(min(d_fwl$y), 0, max(d_fwl$y)), 2), las = 1)
