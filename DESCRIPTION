@@ -1,6 +1,6 @@
 Package: influence
 Title: Sensitivity to influential sets
-Version: 0.0.0.9000
+Version: 0.0.1
 Authors@R:
     person(given = "Nikolas", family = "Kuschnig", role = c("aut", "cre"), email = "nikolas.kuschnig@wu.ac.at", comment = c(ORCID = "0000-0002-6642-2543"))
 Maintainer: Nikolas Kuschnig <nikolas.kuschnig@wu.ac.at>
