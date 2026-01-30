@@ -1,14 +1,21 @@
-
 #' @noRd
-sensitivity_lm <- function(x,
-  lambda = set_lambda(), options = set_options(),
-  cluster = NULL, verbose = TRUE) {
-
+sensitivity_lm <- function(
+  x,
+  lambda = set_lambda(),
+  options = set_options(),
+  cluster = NULL,
+  verbose = TRUE
+) {
   # Inputs ---
 
   verbose <- isTRUE(verbose)
-  meta <- list("lambda" = lambda, "options" = options, "cluster" = cluster,
-    "model" = x, "class" = "lm")
+  meta <- list(
+    "lambda" = lambda,
+    "options" = options,
+    "cluster" = cluster,
+    "model" = x,
+    "class" = "lm"
+  )
 
   # Dimensions
   K <- x$rank
@@ -21,15 +28,14 @@ sensitivity_lm <- function(x,
   data <- get_data(x)
 
   # Reduce covariates using the Frisch-Waugh-Lovell theorem
-  if(!any(options$fwl == 0)) {
-    if(any(options$fwl > K)) {
+  if (!any(options$fwl == 0)) {
+    if (any(options$fwl > K)) {
       warning("No variables to marginalise using FWL found.")
     } else {
       x <- update_fwl(data$X, data$y, variables = options$fwl)
       K <- NCOL(x$X)
     }
   } # Reapplication later is determined by options$fwl_re
-
 
   # Start ---
 
@@ -41,65 +47,103 @@ sensitivity_lm <- function(x,
   idx <- seq.int(N)
   rm <- vector("numeric", n_max)
   # List with values wrt lambda, the model, and the initial approximation
-  out <- structure(list(
-    "influence" = data.frame(
-      "N" = seq.int(N, N - n_max),
-      "id" = c(rank[1L, "order"], rep(NA_integer_, n_max)),
-      "lambda" = c(rank[rank[1L, "order"], "value"], rep(NA_real_, n_max))
+  out <- structure(
+    list(
+      "influence" = data.frame(
+        "N" = seq.int(N, N - n_max),
+        "id" = c(rank[1L, "order"], rep(NA_integer_, n_max)),
+        "lambda" = c(rank[rank[1L, "order"], "value"], rep(NA_real_, n_max))
+      ),
+      "model" = as.data.frame(matrix(
+        NA_real_,
+        n_max + 1L,
+        2 + K * 2 + 3,
+        dimnames = list(
+          NULL,
+          c(
+            "N",
+            "sigma",
+            paste0("beta_", seq.int(K)),
+            paste0("se_", seq.int(K)),
+            "R2",
+            "F",
+            "LL"
+          )
+        )
+      )),
+      "initial" = data.frame(
+        "id" = rank[, "order"],
+        "lambda" = rank[rank[, "order"], "value"]
+      ),
+      "meta" = meta
     ),
-    "model" = as.data.frame(matrix(
-      NA_real_, n_max + 1L, 2 + K * 2 + 3,
-      dimnames = list(NULL, c("N", "sigma",
-        paste0("beta_", seq.int(K)), paste0("se_", seq.int(K)),
-        "R2", "F", "LL")
-      )
-    )),
-    "initial" = data.frame(
-      "id" = rank[, "order"], "lambda" = rank[rank[, "order"], "value"]
-    ),
-    "meta" = meta
-  ), class = "sensitivity")
+    class = "sensitivity"
+  )
 
   # Fill for step one
   rm[1L] <- rank[1L, "order"]
-  out$model[1, ] <- c(N,
-    step$model$sigma, step$model$beta, step$model$se,
-    step$model$r2, step$model$fstat, step$model$ll)
+  out$model[1, ] <- c(
+    N,
+    step$model$sigma,
+    step$model$beta,
+    step$model$se,
+    step$model$r2,
+    step$model$fstat,
+    step$model$ll
+  )
 
   # We're done if there's only one removal
-  if(n_max == 1L) {return(out)}
-
+  if (n_max == 1L) {
+    return(out)
+  }
 
   # Iterate ---
 
   start <- Sys.time()
-  if(verbose) {pb <- txtProgressBar(min = 2L, max = n_max, style = 3L)}
+  if (verbose) {
+    pb <- txtProgressBar(min = 2L, max = n_max, style = 3L)
+  }
 
   # Loop start >
-  for(i in seq.int(2L, n_max + 1L)) {
-
+  for (i in seq.int(2L, n_max + 1L)) {
     # Reorthogonalise FWL
-    if(!any(options$fwl == 0) && (i - 1L) %% options$fwl_re == 0) {
+    if (!any(options$fwl == 0) && (i - 1L) %% options$fwl_re == 0) {
       x <- update_fwl(data$X, data$y, variables = options$fwl, rm = rm)
     }
     # Update XX_inv if we're using Sherman-Morrison
-    XX_inv <- if((i - 1L) %% options$sm_re != 0) {
-      tryCatch(update_inv(step$model$XX_inv,
-        X_rm = get_data(x)$X[rm[i - 1L], , drop = FALSE]),
+    XX_inv <- if ((i - 1L) %% options$sm_re != 0) {
+      tryCatch(
+        update_inv(
+          step$model$XX_inv,
+          X_rm = get_data(x)$X[rm[i - 1L], , drop = FALSE]
+        ),
         error = function(e) {
           chol2inv(qr.R(qr(X[-rm, , drop = FALSE]))) # More robust QR
-        })
-    } else {NULL}
+        }
+      )
+    } else {
+      NULL
+    }
     # Calculate new values
-    step <- tryCatch(influence_lm(x,
-      rm = rm, options = options, cluster = cluster, XX_inv = XX_inv),
+    step <- tryCatch(
+      influence_lm(
+        x,
+        rm = rm,
+        options = options,
+        cluster = cluster,
+        XX_inv = XX_inv
+      ),
       error = function(e) {
-        message("\nComputation failed at step ", i, " with:\n", e); e
-      })
-    if(inherits(step, "error")) {break} # Exit loop
+        message("\nComputation failed at step ", i, " with:\n", e)
+        e
+      }
+    )
+    if (inherits(step, "error")) {
+      break
+    } # Exit loop
     rank <- rank_influence(step, lambda)
     # Find observation to remove next
-    if(isTRUE(options$adaptive)) {
+    if (isTRUE(options$adaptive)) {
       rm[i] <- idx[-rm][rank[1L, "order"]] # Index is kept constant
       rm_val <- rank[rank[1L, "order"], "value"]
     } else {
@@ -110,17 +154,27 @@ sensitivity_lm <- function(x,
     # Store results
     out$influence$id[i] <- rm[i]
     out$influence$lambda[i] <- rm_val
-    out$model[i, ] <- c(N - i + 1,
-      step$model$sigma, step$model$beta, step$model$se,
-      step$model$r2, step$model$fstat, step$model$ll)
+    out$model[i, ] <- c(
+      N - i + 1,
+      step$model$sigma,
+      step$model$beta,
+      step$model$se,
+      step$model$r2,
+      step$model$fstat,
+      step$model$ll
+    )
 
-    if(verbose) {setTxtProgressBar(pb, i)}
+    if (verbose) {
+      setTxtProgressBar(pb, i)
+    }
   }
   # < Loop end
 
   timer <- format(Sys.time() - start)
-  if(verbose) {close(pb); cat("Calculations took ", timer, ".\n", sep = "")}
-
+  if (verbose) {
+    close(pb)
+    cat("Calculations took ", timer, ".\n", sep = "")
+  }
 
   # Wrap up ---
 
